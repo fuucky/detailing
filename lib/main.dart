@@ -3,8 +3,8 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'firebase_options.dart';
 import 'screens/auth_screen.dart';
-import 'screens/home_screen.dart';
-// import 'package:intl/intl.dart';  // importar se for preciso formatar datas
+import 'screens/perfil_admin_screen.dart';
+import 'screens/perfil_cliente_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -30,29 +30,27 @@ class MyApp extends StatelessWidget {
         stream: FirebaseAuth.instance.authStateChanges(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Scaffold(body: Center(child: CircularProgressIndicator()));
-          }
-
-          if (snapshot.hasData) {
-            return const HomeScreen(); // se logado → vai para home
-          }
-          return const AuthScreen(); // se não logado → tela de login/cadastro
-
-          // Teste simples: mostra se Firebase está ok
-          if (Firebase.apps.isEmpty) {
-            return Scaffold(
-              body: Center(
-                child: Text(
-                  'Firebase NÃO inicializado!',
-                  style: TextStyle(fontSize: 24, color: Colors.red),
-                ),
-              ),
+            return const Scaffold(
+              body: Center(child: CircularProgressIndicator()),
             );
           }
 
+          if (snapshot.hasData) {
+            // Verifica se é o admin fake
+            final user = snapshot.data!;
+            final bool isAdmin = user.email == 'admin@fake.com';
+
+            if (isAdmin) {
+              return const PerfilAdminScreen();
+            } else {
+              return const PerfilClienteScreen();
+            }
+          }
+
+          // Se não estiver logado
+          return const AuthScreen();
         },
       ),
     );
   }
 }
-

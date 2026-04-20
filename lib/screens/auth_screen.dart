@@ -1,8 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:estetica_auto/screens/home_screen.dart'; // ajuste se o HomeScreen estiver em outro path
-import 'package:estetica_auto/screens/perfil_cliente_screen.dart';
 import 'package:estetica_auto/screens/perfil_admin_screen.dart';
+import 'package:estetica_auto/screens/perfil_cliente_screen.dart';
 
 class AuthScreen extends StatefulWidget {
   const AuthScreen({super.key});
@@ -15,11 +14,11 @@ class _AuthScreenState extends State<AuthScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
-  bool _isLogin = true; // true = login, false = cadastro
+
+  bool _isLogin = true;     // true = login, false = cadastro
   bool _isLoading = false;
   String? _errorMessage;
 
-  // submit de auth
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -31,103 +30,87 @@ class _AuthScreenState extends State<AuthScreen> {
     final email = _emailController.text.trim();
     final senha = _passwordController.text.trim();
 
-    // Login fake temporário (para teste/protótipo)
-    if (email == 'admin' && senha == 'admin') {
-      try {
-        //cria conta fake admin, unica vez
-        await FirebaseAuth.instance.signInWithEmailAndPassword(
-          email: 'admin@fake.com',
-          password: 'admin123',
-        );
-      } on FirebaseAuthException catch (e) {
-        if (e.code == 'user-not-found') {
-          // cria conta fake se nao existir nenhuma
-          await FirebaseAuth.instance.createUserWithEmailAndPassword(
+    try {
+      UserCredential userCredential;
+
+      // ==================== LOGIN FAKE PARA ADMIN ====================
+      if (email == 'admin' && senha == 'admin') {
+        try {
+          await FirebaseAuth.instance.signInWithEmailAndPassword(
             email: 'admin@fake.com',
             password: 'admin123',
           );
+        } on FirebaseAuthException catch (e) {
+          if (e.code == 'user-not-found') {
+            await FirebaseAuth.instance.createUserWithEmailAndPassword(
+              email: 'admin@fake.com',
+              password: 'admin123',
+            );
+          } else {
+            rethrow;
+          }
+        }
+      }
+      // ==================== LOGIN/CADASTRO REAL ====================
+      else {
+        if (_isLogin) {
+          userCredential = await FirebaseAuth.instance.signInWithEmailAndPassword(
+            email: email,
+            password: senha,
+          );
         } else {
-          rethrow;
+          userCredential = await FirebaseAuth.instance.createUserWithEmailAndPassword(
+            email: email,
+            password: senha,
+          );
         }
       }
 
-      final user = FirebaseAuth.instance.currentUser;
-      final isAdminFake = user?.email == 'admin@fake.com';
+      // ==================== DECIDE PARA ONDE IR ====================
+      final user = userCredential.user;
+      final bool isAdmin = user?.email == 'admin@fake.com';
 
-      //login fake
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (_) => isAdminFake
-              ? const PerfilAdminScreen()
-              : const PerfilClienteScreen(),
-        ),
-      );
-    }
+      if (!mounted) return;
 
-
-    // Se não for admin/admin → usa o login real do Firebase
-    try {
-      if (_isLogin) {
-        await FirebaseAuth.instance.signInWithEmailAndPassword(
-          email: email,
-          password: senha,
+      if (isAdmin) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => const PerfilAdminScreen()),
         );
       } else {
-        await FirebaseAuth.instance.createUserWithEmailAndPassword(
-          email: email,
-          password: senha,
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => const PerfilClienteScreen()),
         );
       }
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) =>  PerfilClienteScreen()),
-      );
 
-      // Sucesso real: StreamBuilder redireciona
     } on FirebaseAuthException catch (e) {
-      String errorMsg;
+      String errorMsg = 'Erro ao autenticar';
       switch (e.code) {
         case 'invalid-email':
-          errorMsg = 'Email inválido ou mal formatado.';
-          break;
-        case 'user-disabled':
-          errorMsg = 'Essa conta foi desativada.';
+          errorMsg = 'Email inválido';
           break;
         case 'user-not-found':
-          errorMsg = 'Nenhum usuário encontrado com esse email.';
+          errorMsg = 'Usuário não encontrado';
           break;
         case 'wrong-password':
-          errorMsg = 'Senha incorreta.';
+          errorMsg = 'Senha incorreta';
           break;
         case 'email-already-in-use':
-          errorMsg = 'Esse email já está cadastrado. Tente entrar.';
+          errorMsg = 'Este email já está cadastrado';
           break;
         case 'weak-password':
-          errorMsg = 'Senha muito fraca (use pelo menos 6 caracteres).';
-          break;
-        case 'operation-not-allowed':
-          errorMsg = 'Cadastro/login por email não está ativado no Firebase.';
-          break;
-        case 'too-many-requests':
-          errorMsg = 'Muitas tentativas. Espere alguns minutos.';
+          errorMsg = 'Senha muito fraca (mínimo 6 caracteres)';
           break;
         case 'network-request-failed':
-          errorMsg = 'Sem conexão com a internet. Verifique sua rede.';
+          errorMsg = 'Sem conexão com a internet';
           break;
         default:
-          errorMsg = 'Erro no Firebase: ${e.code} - ${e.message ?? "Sem detalhes"}';
+          errorMsg = 'Erro: ${e.message}';
       }
-      setState(() {
-        _errorMessage = errorMsg;
-      });
-      print('FirebaseAuthException: code=${e.code}, message=${e.message}');
-    } catch (e, stackTrace) {
-      setState(() {
-        _errorMessage = 'Erro inesperado: $e';
-      });
-      print('Erro geral: $e');
-      print('Stack trace: $stackTrace');
+      setState(() => _errorMessage = errorMsg);
+    } catch (e) {
+      setState(() => _errorMessage = 'Erro inesperado: $e');
     } finally {
       setState(() => _isLoading = false);
     }
@@ -155,7 +138,8 @@ class _AuthScreenState extends State<AuthScreen> {
                   style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
                   textAlign: TextAlign.center,
                 ),
-                const SizedBox(height: 32),
+                const SizedBox(height: 40),
+
                 TextFormField(
                   controller: _emailController,
                   decoration: InputDecoration(
@@ -166,11 +150,13 @@ class _AuthScreenState extends State<AuthScreen> {
                   keyboardType: TextInputType.emailAddress,
                   validator: (value) {
                     if (value == null || value.isEmpty) return 'Digite seu email';
-                    if (!value.contains('')) return 'Email inválido';
+                    if (!value.contains('@')) return 'Email inválido';
                     return null;
                   },
                 ),
+
                 const SizedBox(height: 16),
+
                 TextFormField(
                   controller: _passwordController,
                   decoration: InputDecoration(
@@ -181,19 +167,22 @@ class _AuthScreenState extends State<AuthScreen> {
                   obscureText: true,
                   validator: (value) {
                     if (value == null || value.isEmpty) return 'Digite sua senha';
-                    if (value.length < 3) return 'Senha deve ter pelo menos 6 caracteres'; // SUBSTITUIR O NUMERO DE LETRAS "1 É APENAS TESTE"
+                    if (value.length < 6) return 'Senha deve ter pelo menos 6 caracteres';
                     return null;
                   },
                 ),
+
                 if (_errorMessage != null) ...[
                   const SizedBox(height: 16),
                   Text(
                     _errorMessage!,
-                    style: const TextStyle(color: Colors.red, fontSize: 14),
+                    style: const TextStyle(color: Colors.red),
                     textAlign: TextAlign.center,
                   ),
                 ],
+
                 const SizedBox(height: 32),
+
                 if (_isLoading)
                   const Center(child: CircularProgressIndicator())
                 else
@@ -210,6 +199,7 @@ class _AuthScreenState extends State<AuthScreen> {
                       style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                     ),
                   ),
+
                 const SizedBox(height: 16),
                 TextButton(
                   onPressed: () {
@@ -220,7 +210,7 @@ class _AuthScreenState extends State<AuthScreen> {
                   },
                   child: Text(
                     _isLogin ? 'Não tem conta? Cadastre-se' : 'Já tem conta? Entrar',
-                    style: const TextStyle(fontSize: 16, color: Colors.blueGrey),
+                    style: const TextStyle(color: Colors.blueGrey),
                   ),
                 ),
               ],
