@@ -36,13 +36,13 @@ class _AuthScreenState extends State<AuthScreen> {
       // ==================== LOGIN FAKE PARA ADMIN ====================
       if (email == 'admin' && senha == 'admin') {
         try {
-          await FirebaseAuth.instance.signInWithEmailAndPassword(
+          userCredential = await FirebaseAuth.instance.signInWithEmailAndPassword(
             email: 'admin@fake.com',
             password: 'admin123',
           );
         } on FirebaseAuthException catch (e) {
           if (e.code == 'user-not-found') {
-            await FirebaseAuth.instance.createUserWithEmailAndPassword(
+            userCredential = await FirebaseAuth.instance.createUserWithEmailAndPassword(
               email: 'admin@fake.com',
               password: 'admin123',
             );
@@ -134,7 +134,7 @@ class _AuthScreenState extends State<AuthScreen> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Text(
-                  _isLogin ? 'Bem-vindo de volta!' : 'Crie sua conta',
+                  _isLogin ? 'Bem-vindo!' : 'Crie sua conta',
                   style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
                   textAlign: TextAlign.center,
                 ),
